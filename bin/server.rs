@@ -1,13 +1,15 @@
 extern crate engine_backend;
 extern crate utilities;
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use engine_backend::BackendServer;
+use utilities::result::Result;
 use utilities::setup::SharedSetup;
 
-fn main() {
-    let setup = Arc::new(Mutex::new(SharedSetup::new().unwrap()));
+#[tokio::main]
+async fn main() -> Result<()> {
+    let setup = Arc::new(SharedSetup::new()?);
     let server = BackendServer::new(setup);
-    server.enable_subscriptions()
+    server.enable_subscriptions().await
 }
