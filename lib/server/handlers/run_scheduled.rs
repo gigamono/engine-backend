@@ -1,6 +1,5 @@
 use nats::Message;
-use log::info;
 
-pub(crate) fn run_scheduled(msg: Message) {
+pub(crate) fn _run_scheduled(_msg: Message) {
     todo!()
 }

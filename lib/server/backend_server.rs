@@ -1,11 +1,11 @@
 use crate::handlers;
-use log::info;
+use log::{error, info};
 use std::sync::Arc;
 use tokio::task;
 use utilities::{
     messages::error::SystemError,
-    nats::{self, WorkspacesAction},
-    result::Result,
+    natsio::{self, Message, WorkspacesAction},
+    result::{HandlerResult, Result},
     setup::SharedSetup,
 };
 
@@ -25,31 +25,29 @@ impl BackendServer {
         // Get config.
         let config = &self.setup.config;
 
-        // Get workspace subject.
-        let subj = nats::get_workpace_subject(
-            config,
-            WorkspacesAction::RunSurl,
-            Some("*"), // TODO: Use config.
-        );
+        // Get subscribed target.
+        let sub_target = natsio::get_backend_first_sub_target(config, WorkspacesAction::RunSurl);
 
-        info!(r#"Subscribing to subject "{}""#, subj);
+        // Get workspace subject.
+        let subject = natsio::get_workpace_subject(&config, WorkspacesAction::RunSurl, sub_target);
+
+        info!(r#"Subscribing to subject "{}""#, subject);
 
         // Get nats connection object.
-        let conn = &self.setup.nats.conn;
+        let nats_conn = &self.setup.nats;
 
         // Queue-subscribe to subject.
-        let sub = conn
-            .queue_subscribe(&subj, "v1.run_surl.workspace_responder") // TODO: need get_workpace_subject_responder
-            .map_err(|err| SystemError::Io {
-                ctx: "unable to subscribe".to_string(),
-                src: err,
-            })?;
+        let subscription =
+            nats_conn.queue_subscribe(&subject, "v1.run_surl.workspace_responder")?; // TODO: need get_workpace_subject_responder
 
         // Create a ref-counted subscription.
-        let arc_sub = Arc::new(sub);
+        let arc_sub = Arc::new(subscription);
 
         // Clone subscription for use in a separate thread.
         let arc_sub = Arc::clone(&arc_sub);
+
+        // Clone setup for spawn_block.
+        let setup = Arc::clone(&self.setup);
 
         // Start a blocking thread for `arc_sub.next` calls.
         task::spawn_blocking(move || {
@@ -57,8 +55,15 @@ impl BackendServer {
                 // Panics if connection closed or subscription cancelled.
                 let msg = arc_sub.next().unwrap();
 
-                // Push handler to a separate task.
-                tokio::spawn(async move { handlers::run_surl(msg) });
+                // Clone setup for async block.
+                let setup = Arc::clone(&setup);
+
+                // Spawn task.
+                tokio::spawn(async move {
+                    // Call handler function and check error.
+                    let result = handlers::run_surl(setup, &msg).await;
+                    Self::check_error(result, &msg);
+                });
             }
         })
         .await
@@ -66,5 +71,12 @@ impl BackendServer {
             ctx: "unable to start a blocking thread for `next` calls".to_string(),
             src: err,
         })?
+    }
+
+    fn check_error(e: HandlerResult<()>, msg: &Message) {
+        if let Err(e) = e {
+            error!("{}", e);
+            msg.respond(b"????").unwrap(); // TODO: Send error message.
+        }
     }
 }
