@@ -2,13 +2,14 @@ use std::sync::Arc;
 
 use natsio::Message;
 use utilities::{
+    http::StatusCode,
     messages::error::{HandlerError, HandlerErrorMessage, SystemError},
     natsio,
     result::HandlerResult,
     setup::SharedSetup,
 };
 
-use crate::{executor_surl::SurlExecutor, file_manager::FileManager};
+use crate::{FileManager, SurlContext};
 
 pub(crate) async fn run_surl(setup: Arc<SharedSetup>, msg: &Message) -> HandlerResult<()> {
     // Get config.
@@ -22,11 +23,23 @@ pub(crate) async fn run_surl(setup: Arc<SharedSetup>, msg: &Message) -> HandlerR
         .await
         .map_err(internal_error)?;
 
-    // Create executor.
-    let executor = SurlExecutor::new(file_mgr).await.map_err(internal_error)?;
+    // Create surl runner.
+    let ctx = SurlContext::new(file_mgr).await.map_err(internal_error)?;
 
-    // TODO: Do something result.
-    let result = executor.execute().await.map_err(internal_error)?;
+    // Execute surl.
+    if ctx.execute().await.map_err(internal_error)? {
+        // If result is false, then one of auth or middleware failed.
+        return Err(HandlerError::Client {
+            ctx: HandlerErrorMessage::AuthMiddleware,
+            code: StatusCode::UNAUTHORIZED,
+            src: SystemError::Generic {
+                ctx: "one of authorisation or middleware failed".to_string(),
+            },
+        });
+    }
+
+    // TODO: Executing ths surl context should save response somewhere that we can then send.
+    //       Or it should send it within the ops?
 
     // Publish message.
     msg.respond(msg.data.as_slice())

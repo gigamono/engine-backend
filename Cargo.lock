@@ -2121,9 +2121,9 @@ dependencies = [
 name = "tera"
 version = "0.1.0"
 dependencies = [
- "deno_core",
  "tokio 1.12.0",
  "utilities",
+ "v8",
 ]
 
 [[package]]
@@ -2443,6 +2443,19 @@ name = "uuid"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
+
+[[package]]
+name = "v8"
+version = "0.33.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b3adb16fd1af3e28d6fda8348a6d96b5363a128dc5a0216b137b64ecbae6641"
+dependencies = [
+ "bitflags",
+ "fslock",
+ "lazy_static",
+ "libc",
+ "which",
+]
 
 [[package]]
 name = "vcpkg"

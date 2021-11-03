@@ -1,4 +1,4 @@
-use crate::workspace_paths::WorkspacePaths;
+use crate::WorkspacePaths;
 use tokio::fs;
 use utilities::{
     config::GigamonoConfig, messages::error::SystemError, natsio::Payload, result::Result,
