@@ -1,8 +1,6 @@
 use crate::WorkspacePaths;
 use tokio::fs;
-use utilities::{
-    config::GigamonoConfig, messages::error::SystemError, natsio::Payload, result::Result,
-};
+use utilities::{config::GigamonoConfig, natsio::Payload, result::{Result, Context}};
 
 pub struct FileManager {
     pub(crate) paths: WorkspacePaths,
@@ -20,10 +18,7 @@ impl FileManager {
 
         fs::read_to_string(&path)
             .await
-            .map_err(|err| SystemError::Io {
-                ctx: format!(r#"attempt to read file, "{:?}""#, path),
-                src: err,
-            })
+            .context(format!(r#"attempt to read file, "{:?}""#, path))
     }
 
     pub async fn read_file_from_surl(&self, relative_path: &str) -> Result<String> {
@@ -31,9 +26,6 @@ impl FileManager {
 
         fs::read_to_string(&path)
             .await
-            .map_err(|err| SystemError::Io {
-                ctx: format!(r#"attempt to read file, "{:?}""#, path),
-                src: err,
-            })
+            .context(format!(r#"attempt to read file, "{:?}""#, path))
     }
 }

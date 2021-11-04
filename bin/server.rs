@@ -11,5 +11,5 @@ use utilities::setup::SharedSetup;
 async fn main() -> Result<()> {
     let setup = Arc::new(SharedSetup::new()?);
     let server = BackendServer::new(setup);
-    server.enable_subscriptions().await
+    server.handle_subscriptions().await
 }

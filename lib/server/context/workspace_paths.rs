@@ -2,7 +2,10 @@ use log::info;
 use std::path::PathBuf;
 use tokio::fs;
 use utilities::{
-    config::GigamonoConfig, messages::error::SystemError, natsio::Payload, result::Result,
+    config::GigamonoConfig,
+    errors,
+    natsio::Payload,
+    result::{Context, Result},
 };
 
 pub struct WorkspacePaths {
@@ -17,12 +20,10 @@ impl WorkspacePaths {
 
         // Construct canonical workspace path.
         let full_path = format!("{}/workspaces/{}", root_path, payload.workspace_id);
-        let canon_w_path = fs::canonicalize(&full_path)
-            .await
-            .map_err(|err| SystemError::Io {
-                ctx: format!(r#"getting canonical workspace path from, "{}""#, full_path),
-                src: err,
-            })?;
+        let canon_w_path = fs::canonicalize(&full_path).await.context(format!(
+            r#"getting canonical workspace path from, "{}""#,
+            full_path
+        ))?;
 
         info!("Canonical workspace path = {:?}", canon_w_path);
 
@@ -43,24 +44,17 @@ impl WorkspacePaths {
     pub async fn get_canon_path(&self, relative_path: &str) -> Result<PathBuf> {
         // Construct canonical path.
         let full_path = format!("{}/{}", self.canon_w_path.display(), relative_path);
-        let resolved_path = fs::canonicalize(&full_path)
-            .await
-            .map_err(|err| SystemError::Io {
-                ctx: format!(
-                    r#"getting canonical path of a workspace-relative path from, "{}""#,
-                    full_path
-                ),
-                src: err,
-            })?;
+        let resolved_path = fs::canonicalize(&full_path).await.context(format!(
+            r#"getting canonical path of a workspace-relative path from, "{}""#,
+            full_path
+        ))?;
 
         // SEC: Making sure canon_w_path is still base.
         if !resolved_path.starts_with(&self.canon_w_path) {
-            return Err(SystemError::Generic {
-                ctx: format!(
-                    r#"ensuring caonical workspace path is still the base of resolved relative path "{}""#,
-                    resolved_path.display(),
-                ),
-            });
+            errors::any_error(format!(
+                r#"path {:?} must be a under of workspace path {:?}"#,
+                resolved_path, self.canon_w_path,
+            ))?;
         }
 
         Ok(resolved_path)
