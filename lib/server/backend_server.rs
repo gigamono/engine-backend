@@ -61,7 +61,10 @@ impl BackendServer {
                     .next()
                     .expect("connection closed or subsscription canceled");
 
-                info!("Got the next message");
+                info!(
+                    r#"New message {{ subject: "{}"; reply: {:?} }}"#,
+                    msg.subject, msg.reply
+                );
 
                 // Spawn task as V8 Isolate is !Send.
                 let local = task::LocalSet::new();

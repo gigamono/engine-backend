@@ -25,7 +25,7 @@ impl WorkspacePaths {
             full_path
         ))?;
 
-        info!("Canonical workspace path = {:?}", canon_w_path);
+        info!("Canonical workspace path {:?}", canon_w_path);
 
         // Get stripped url path.
         let mut url_path = payload.request.path.as_str();
@@ -33,7 +33,7 @@ impl WorkspacePaths {
             url_path = stripped_path;
         }
 
-        info!("Path suffix = {}", url_path);
+        info!("Path suffix {:?}", url_path);
 
         Ok(Self {
             canon_w_path: canon_w_path,
