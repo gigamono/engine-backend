@@ -1,6 +1,7 @@
 use crate::handlers;
+use futures::FutureExt;
 use log::{error, info};
-use std::sync::Arc;
+use std::{future::Future, panic::AssertUnwindSafe, sync::Arc};
 use tokio::{runtime::Runtime, task};
 use utilities::{
     natsio::{self, Message, WorkspacesAction},
@@ -17,7 +18,7 @@ impl BackendServer {
         Self { setup }
     }
 
-    pub async fn handle_subscriptions(&self) -> Result<()> {
+    pub async fn listen(&self) -> Result<()> {
         // Initialize logger.
         env_logger::init();
 
@@ -71,13 +72,9 @@ impl BackendServer {
 
                 // Run the local task set.
                 local.block_on(&mut rt, async move {
-                    task::spawn_local(async move {
-                        // Call handler function and check error.
-                        let result = handlers::run_surl(setup, &msg).await;
-                        Self::check_error(result, &msg);
-                    })
-                    .await
-                    .expect("spawning request handling task on local thread")
+                    task::spawn_local(Self::error_wrap(handlers::run_surl, setup, msg))
+                        .await
+                        .expect("spawning request handling task on local thread")
                 });
             })
             .await
@@ -85,10 +82,36 @@ impl BackendServer {
         }
     }
 
-    fn check_error(e: HandlerResult<()>, msg: &Message) {
-        if let Err(e) = e {
-            error!("{:?}", e);
-            msg.respond(b"????").expect("replying client"); // TODO(appcypher): Send error message.
-        }
+    async fn error_wrap<F, Fut>(func: F, setup: Arc<SharedSetup>, msg: Message)
+    where
+        F: FnOnce(Arc<SharedSetup>, Arc<Message>) -> Fut,
+        Fut: Future<Output = HandlerResult<Vec<u8>>>,
+    {
+        let msg = Arc::new(msg);
+
+        // AssertUnwindSafe to catch handler panics and log errors.
+        match AssertUnwindSafe(func(setup, Arc::clone(&msg)))
+            .catch_unwind()
+            .await
+        {
+            // Handler returned a result.
+            Ok(Ok(response)) => {
+                // Send response.
+                msg.respond(response).unwrap();
+            }
+            Ok(Err(err)) => {
+                // Log error.
+                error!("{:?}", err);
+
+                // TODO(appcypher): Generating an http request from HandlerError
+                // Send appropriate server response.
+                msg.respond(b"Placeholder <An error occured>").unwrap();
+            }
+            // Handler panicked.
+            Err(err) => {
+                // We catch panics, just to log the error.
+                error!("{:?}", err);
+            }
+        };
     }
 }

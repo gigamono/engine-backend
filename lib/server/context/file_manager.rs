@@ -1,15 +1,18 @@
 use crate::WorkspacePaths;
 use tokio::fs;
-use utilities::{config::GigamonoConfig, natsio::Payload, result::{Result, Context}};
+use utilities::{
+    config::GigamonoConfig,
+    result::{Context, Result},
+};
 
 pub struct FileManager {
     pub(crate) paths: WorkspacePaths,
 }
 
 impl FileManager {
-    pub(crate) async fn new(payload: &Payload, config: &GigamonoConfig) -> Result<Self> {
+    pub(crate) async fn new(workspace_id: &str, url_path: &str, config: &GigamonoConfig) -> Result<Self> {
         // Construct new workspace path.
-        let paths = WorkspacePaths::new(payload, config).await?;
+        let paths = WorkspacePaths::new(workspace_id, url_path, config).await?;
         Ok(Self { paths })
     }
 

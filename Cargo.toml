@@ -19,6 +19,7 @@ secure-runtime = { path = "../secure-runtime" }
 tokio = { version = "1", features = ["full"] }
 env_logger = "0.9.0"
 log = "0.4.14"
+futures = "0.3.17"
 
 [lib]
 name = "engine_backend"
@@ -26,4 +27,4 @@ path = "lib/lib.rs"
 
 [[bin]]
 name = "server"
-path = "bin/server.rs"
+path = "bin/backend_server.rs"

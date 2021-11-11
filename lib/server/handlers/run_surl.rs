@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{str::Bytes, sync::Arc};
 
 use natsio::Message;
 use utilities::{
@@ -11,15 +11,18 @@ use utilities::{
 
 use crate::{FileManager, SurlExecutor};
 
-pub(crate) async fn run_surl(setup: Arc<SharedSetup>, msg: &Message) -> HandlerResult<()> {
+use super::utils;
+
+pub(crate) async fn run_surl(setup: Arc<SharedSetup>, msg: Arc<Message>) -> HandlerResult<Vec<u8>> {
     // Get config.
     let config = &setup.config;
 
-    // Deserialize request.
-    let payload = natsio::deserialize(&msg.data).map_err(internal_error)?;
+    // Get URL path and workspace id from message headers.
+    let workspace_id = utils::get_first_from_headers(&msg, "workspace_id").map_err(internal_error)?;
+    let url_path = utils::get_first_from_headers(&msg, "path").map_err(internal_error)?;
 
     // Create file manager.
-    let file_mgr = FileManager::new(&payload, config)
+    let file_mgr = FileManager::new(&workspace_id, &url_path, config)
         .await
         .map_err(internal_error)?;
 
@@ -31,18 +34,16 @@ pub(crate) async fn run_surl(setup: Arc<SharedSetup>, msg: &Message) -> HandlerR
         // If result is false, then one of auth or middleware failed.
         return Err(HandlerError::Client {
             ctx: HandlerErrorMessage::AuthMiddleware,
-            code: StatusCode::UNAUTHORIZED,
+            code: StatusCode::Unauthorized,
             src: errors::any_error("one of authorisation or middleware failed").unwrap_err(),
         });
     }
 
-    // TODO(appcypher): Executing ths surl context should save response somewhere that we can then send or it should send it within the ops?
+    // TODO(appcypher): Executing ths surl context should save response somewhere that we can then send or it should send it within the ops?\
 
-    // Publish message.
-    msg.respond(msg.data.as_slice())
-        .map_err(|err| HandlerError::Critical {
-            src: errors::wrap_error("sending a reply", err).unwrap_err(),
-        })
+    // Return message.
+    // TODO(appcypher): Return bytes
+    Ok(vec![])
 }
 
 pub fn internal_error(err: SystemError) -> HandlerError {
