@@ -9,7 +9,7 @@ use utilities::setup::SharedSetup;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let setup = Arc::new(SharedSetup::new()?);
+    let setup = Arc::new(SharedSetup::new().await?);
     let server = BackendServer::new(setup);
     server.listen().await
 }

@@ -2,7 +2,7 @@ use crate::handlers;
 use futures::FutureExt;
 use log::{error, info};
 use std::{future::Future, panic::AssertUnwindSafe, sync::Arc};
-use tokio::{runtime::Runtime, task};
+use tokio::task;
 use utilities::{
     natsio::{self, Message, WorkspacesAction},
     result::{Context, HandlerResult, Result},
@@ -37,48 +37,42 @@ impl BackendServer {
         let nats_conn = &self.setup.nats;
 
         // Queue-subscribe to subject.
-        let subscription =
-            nats_conn.queue_subscribe(&subject, "v1.run_surl.workspace_responder")?; // TODO(appcypher): need get_workpace_subject_responder
+        let subscription = nats_conn
+            .queue_subscribe(&subject, "v1.run_surl.workspace_responder")
+            .await
+            .context(format!(r#"queue subscribing to subject, "{}""#, subject))?; // TODO(appcypher): need get_workpace_subject_responder
 
-        // Create a ref-counted subscription.
-        let arc_sub = Arc::new(subscription);
+        // Create a Sync subscription.
+        let sub = Arc::new(subscription);
+
+        // Create a local task set to run tasks on the current thread because V8 Isolate (an some others) used in message handlers are !Send.
+        let local = task::LocalSet::new();
 
         // Handle messages infinitely.
+        // TODO(appcypher):
+        // Right now everything runs on single thread due to LocalTaskSet. Find a way to create futures on multiple threads and start them on their respective thread.
+        // Maybe start a different os thread on each iteration. Maybe Rayon. No clue yet.
         loop {
-            // Clone setup for spawn_block.
-            let setup = Arc::clone(&self.setup);
+            // Get next message. Panics if connection closed or subscription canceled.
+            let msg = sub
+                .next()
+                .await
+                .context("connection closed or subscription canceled")?;
 
-            // Clone subscription for use in a separate thread.
-            let arc_sub = Arc::clone(&arc_sub);
+            info!(
+                r#"New message {{ subject: "{}"; reply: {:?} }}"#,
+                msg.subject, msg.reply
+            );
 
-            // Create a reusable tokio runtime.
-            let mut rt =
-                Runtime::new().expect("creating a new tokio runtime for handling requests");
-
-            // Start a blocking thread for each `arc_sub.next` call.
-            task::spawn_blocking(move || {
-                // Panics if connection closed or subscription canceled.
-                let msg = arc_sub
-                    .next()
-                    .expect("connection closed or subsscription canceled");
-
-                info!(
-                    r#"New message {{ subject: "{}"; reply: {:?} }}"#,
-                    msg.subject, msg.reply
-                );
-
-                // Spawn task as V8 Isolate is !Send.
-                let local = task::LocalSet::new();
-
-                // Run the local task set.
-                local.block_on(&mut rt, async move {
-                    task::spawn_local(Self::error_wrap(handlers::run_surl, setup, msg))
-                        .await
-                        .expect("spawning request handling task on local thread")
-                });
-            })
-            .await
-            .context("starting a blocking thread for `next` calls")?
+            // Run the local task on current thread. And catch error before it propagates.
+            local
+                .run_until(local.spawn_local(Self::error_wrap(
+                    handlers::run_surl,
+                    Arc::clone(&self.setup),
+                    msg,
+                )))
+                .await
+                .context("running local task")?
         }
     }
 
@@ -96,22 +90,34 @@ impl BackendServer {
         {
             // Handler returned a result.
             Ok(Ok(response)) => {
-                // Send response.
-                msg.respond(response).unwrap();
+                // Send response. Ignore error if unable to do that.
+                if let Err(err) = msg
+                    .respond(response)
+                    .await
+                    .context("sending message via reply channel")
+                {
+                    error!("{:?}", err);
+                };
             }
             Ok(Err(err)) => {
                 // Log error.
                 error!("{:?}", err);
 
                 // TODO(appcypher): Generating an http request from HandlerError
-                // Send appropriate server response.
-                msg.respond(b"Placeholder <An error occured>").unwrap();
+                // Send appropriate server response. Ignore error if unable to do that.
+                if let Err(err) = msg
+                    .respond(b"Placeholder <An error occured>")
+                    .await
+                    .context("sending error message via reply channel")
+                {
+                    error!("{:?}", err);
+                };
             }
             // Handler panicked.
             Err(err) => {
                 // We catch panics, just to log the error.
                 error!("{:?}", err);
             }
-        };
+        }
     }
 }

@@ -10,7 +10,11 @@ pub struct FileManager {
 }
 
 impl FileManager {
-    pub(crate) async fn new(workspace_id: &str, url_path: &str, config: &GigamonoConfig) -> Result<Self> {
+    pub(crate) async fn new(
+        workspace_id: &str,
+        url_path: &str,
+        config: &GigamonoConfig,
+    ) -> Result<Self> {
         // Construct new workspace path.
         let paths = WorkspacePaths::new(workspace_id, url_path, config).await?;
         Ok(Self { paths })

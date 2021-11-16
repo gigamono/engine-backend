@@ -11,15 +11,16 @@ use utilities::{
 
 use crate::{FileManager, SurlExecutor};
 
-use super::utils;
-
 pub(crate) async fn run_surl(setup: Arc<SharedSetup>, msg: Arc<Message>) -> HandlerResult<Vec<u8>> {
     // Get config.
     let config = &setup.config;
 
-    // Get URL path and workspace id from message headers.
-    let workspace_id = utils::get_first_from_headers(&msg, "workspace_id").map_err(internal_error)?;
-    let url_path = utils::get_first_from_headers(&msg, "path").map_err(internal_error)?;
+    // Get workspace id and URL path from message headers.
+    let workspace_id = natsio::get_first_from_headers(&msg, natsio::WORKSPACE_ID_HEADER)
+        .map_err(internal_error)?;
+
+    let url_path =
+        natsio::get_first_from_headers(&msg, natsio::URL_PATH_HEADER).map_err(internal_error)?;
 
     // Create file manager.
     let file_mgr = FileManager::new(&workspace_id, &url_path, config)
