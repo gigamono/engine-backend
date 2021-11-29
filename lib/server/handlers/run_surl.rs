@@ -1,15 +1,18 @@
-use std::{str::Bytes, sync::Arc};
+// Copyright 2021 the Gigamono authors. All rights reserved. Apache 2.0 license.
+
+use std::sync::Arc;
 
 use natsio::Message;
+use tera::events::Events;
 use utilities::{
     errors::{self, HandlerError, HandlerErrorMessage, SystemError},
-    http::StatusCode,
+    http::{Request, StatusCode},
     natsio,
     result::HandlerResult,
     setup::SharedSetup,
 };
 
-use crate::{FileManager, SurlExecutor};
+use crate::{files::FileManager, runtimes::SurlRuntime};
 
 pub(crate) async fn run_surl(setup: Arc<SharedSetup>, msg: Arc<Message>) -> HandlerResult<Vec<u8>> {
     // Get config.
@@ -27,8 +30,20 @@ pub(crate) async fn run_surl(setup: Arc<SharedSetup>, msg: Arc<Message>) -> Hand
         .await
         .map_err(internal_error)?;
 
+    // Deserialise msg.
+    let request: Request =
+        bincode::deserialize(&msg.data).map_err(|err| HandlerError::Internal {
+            ctx: HandlerErrorMessage::InternalError,
+            src: errors::wrap_error("deserialising http request from nats msg", err).unwrap_err(),
+        })?;
+
+    // TODO(appcypher): Events.
+    let events = Events::default();
+
     // Create surl runner.
-    let surl_exec = SurlExecutor::new(file_mgr).await.map_err(internal_error)?;
+    let surl_exec = SurlRuntime::new(file_mgr, events)
+        .await
+        .map_err(internal_error)?;
 
     // Execute surl.
     if !surl_exec.execute().await.map_err(internal_error)? {

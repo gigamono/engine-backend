@@ -1,3 +1,5 @@
+// Copyright 2021 the Gigamono authors. All rights reserved. Apache 2.0 license.
+
 use log::info;
 use std::path::PathBuf;
 use tokio::fs;

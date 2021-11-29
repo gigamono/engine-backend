@@ -1,17 +1,26 @@
-use crate::FileManager;
-use secure_runtime::SecureRuntime;
+// Copyright 2021 the Gigamono authors. All rights reserved. Apache 2.0 license.
+
+use crate::files::FileManager;
+use tera::{Runtime, events::Events};
 use utilities::{config::SurlManifest, result::Result};
 
-pub(crate) struct SurlExecutor {
+pub(crate) struct SurlRuntime {
     file_mgr: FileManager,
     manifest: SurlManifest,
+    events: Events,
 }
 
-impl SurlExecutor {
-    pub async fn new(file_mgr: FileManager) -> Result<Self> {
+impl SurlRuntime {
+    pub async fn new(file_mgr: FileManager, events: Events) -> Result<Self> {
+        // Save Surl manifest.
         let content = file_mgr.read_file_from_surl("surl.yaml").await?;
         let manifest = SurlManifest::new(&content)?;
-        Ok(Self { file_mgr, manifest })
+
+        Ok(Self {
+            file_mgr,
+            manifest,
+            events,
+        })
     }
 
     pub async fn execute(&self) -> Result<bool> {
@@ -37,8 +46,8 @@ impl SurlExecutor {
 
         // Execute module.
         let permissions = Default::default();
-        let mut runtime = SecureRuntime::new_default(permissions).await?;
-        runtime.execute_main_module(filename, code).await?;
+        let mut runtime = Runtime::default_event(permissions, self.events).await?;
+        runtime.execute_module(filename, code).await?;
 
         Ok(true) // TODO(appcypher): Check value ok
     }
@@ -50,8 +59,8 @@ impl SurlExecutor {
 
             // Execute module.
             let permissions = Default::default();
-            let mut runtime = SecureRuntime::new_default(permissions).await?;
-            runtime.execute_main_module(filename, code).await?;
+            let mut runtime = Runtime::default_event(permissions, self.events).await?;
+            runtime.execute_module(filename, code).await?;
 
             // TODO(appcypher): Check value ok
         }
@@ -65,8 +74,8 @@ impl SurlExecutor {
 
         // Execute module.
         let permissions = Default::default();
-        let mut runtime = SecureRuntime::new_default(permissions).await?;
-        runtime.execute_main_module(filename, code).await?;
+        let mut runtime = Runtime::default_event(permissions, self.events).await?;
+        runtime.execute_module(filename, code).await?;
 
         Ok(())
     }
