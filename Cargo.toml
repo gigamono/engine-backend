@@ -21,11 +21,12 @@ env_logger = "0.9.0"
 log = "0.4.14"
 futures = "0.3.17"
 bincode = "1.3.3"
+futures-util = "0.3.18"
 
 [lib]
 name = "engine_backend"
 path = "lib/lib.rs"
 
 [[bin]]
-name = "server"
-path = "bin/backend_server.rs"
+name = "nats_server"
+path = "bin/nats_server.rs"

@@ -1,6 +1,6 @@
 // Copyright 2021 the Gigamono authors. All rights reserved. Apache 2.0 license.
 
-use crate::handlers;
+use super::handlers;
 use futures::FutureExt;
 use log::{error, info};
 use std::{future::Future, panic::AssertUnwindSafe, sync::Arc};
@@ -11,11 +11,11 @@ use utilities::{
     setup::SharedSetup,
 };
 
-pub struct BackendServer {
+pub struct BackendNatsServer {
     setup: Arc<SharedSetup>,
 }
 
-impl BackendServer {
+impl BackendNatsServer {
     pub fn new(setup: Arc<SharedSetup>) -> Self {
         Self { setup }
     }
@@ -31,7 +31,8 @@ impl BackendServer {
         let sub_target = natsio::get_backend_first_sub_target(config, WorkspacesAction::RunSurl);
 
         // Get workspace subject.
-        let subject = natsio::get_workpace_subject(&config, WorkspacesAction::RunSurl, sub_target);
+        let subject =
+            natsio::create_workpaces_subject(&config, WorkspacesAction::RunSurl, sub_target);
 
         info!(r#"Subscribing to subject "{}""#, subject);
 
@@ -40,7 +41,7 @@ impl BackendServer {
 
         // Queue-subscribe to subject.
         let subscription = nats_conn
-            .queue_subscribe(&subject, "v1.run_surl.workspace_responder")
+            .queue_subscribe(&subject, natsio::DEFAULT_QUEUE_GROUP_NAME)
             .await
             .context(format!(r#"queue subscribing to subject, "{}""#, subject))?; // TODO(appcypher): need get_workpace_subject_responder
 

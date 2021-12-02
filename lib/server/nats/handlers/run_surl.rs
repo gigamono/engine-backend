@@ -1,6 +1,6 @@
 // Copyright 2021 the Gigamono authors. All rights reserved. Apache 2.0 license.
 
-use std::sync::Arc;
+use std::{rc::Rc, sync::Arc};
 
 use natsio::Message;
 use tera::events::Events;
@@ -38,7 +38,7 @@ pub(crate) async fn run_surl(setup: Arc<SharedSetup>, msg: Arc<Message>) -> Hand
         })?;
 
     // TODO(appcypher): Events.
-    let events = Events::default();
+    let events = Rc::new(Events::default());
 
     // Create surl runner.
     let surl_exec = SurlRuntime::new(file_mgr, events)

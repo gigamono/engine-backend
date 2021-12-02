@@ -4,6 +4,6 @@ mod server;
 pub mod files;
 pub mod paths;
 pub mod runtimes;
-pub mod responder;
+pub mod streamer;
 
 pub use server::*;
