@@ -1,14 +1,14 @@
 [package]
-name = "engine-backend"
+name = "engine_backend"
 version = "0.1.0"
 edition = "2018"
 authors = ["Stephen Akinyemi <appcypher@outlook.com>"]
 description = "The backend implementation of Gigamono"
 readme = "README.md"
-repository = "https://github.com/gigamono/engine-backend"
+repository = "https://github.com/gigamono/engine_backend"
 keywords = ["no-code", "capabilities", "runtime", "serverless", "deno"]
 categories = ["development-tools", "web-programming"]
-documentation = "https://github.com/gigamono/engine-backend"
+documentation = "https://github.com/gigamono/engine_backend"
 homepage = "https://gigamono.com"
 license-file = "LICENSE"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -28,5 +28,5 @@ name = "engine_backend"
 path = "lib/lib.rs"
 
 [[bin]]
-name = "nats_server"
-path = "bin/nats_server.rs"
+name = "server"
+path = "bin/backend_server.rs"

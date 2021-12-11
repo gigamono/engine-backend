@@ -10,8 +10,8 @@ use utilities::{
 };
 
 pub struct WorkspacePaths {
-    canon_w_path: PathBuf,
-    url_path: String,
+    pub(crate) canon_w_path: PathBuf,
+    pub(crate) url_path: String,
 }
 
 impl WorkspacePaths {
@@ -52,7 +52,7 @@ impl WorkspacePaths {
 
         // SEC: Making sure canon_w_path is still base.
         if !resolved_path.starts_with(&self.canon_w_path) {
-            errors::any_error(format!(
+            errors::new_error_t(format!(
                 r#"path {:?} must be a under of workspace path {:?}"#,
                 resolved_path, self.canon_w_path,
             ))?;

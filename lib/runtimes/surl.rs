@@ -1,6 +1,6 @@
 // Copyright 2021 the Gigamono authors. All rights reserved. Apache 2.0 license.
 
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 use crate::files::FileManager;
 use tera::{events::Events, Runtime};
@@ -9,14 +9,14 @@ use utilities::{config::SurlManifest, result::Result};
 pub struct SurlRuntime {
     file_mgr: FileManager,
     manifest: SurlManifest,
-    events: Rc<Events>,
+    events: Rc<RefCell<Events>>,
 }
 
 impl SurlRuntime {
-    pub async fn new(file_mgr: FileManager, events: Rc<Events>) -> Result<Self> {
+    pub async fn new(file_mgr: FileManager, events: Rc<RefCell<Events>>) -> Result<Self> {
         // Save Surl manifest.
         let content = file_mgr.read_file_from_surl("surl.yaml").await?;
-        let manifest = SurlManifest::new(&content)?;
+        let manifest = SurlManifest::try_from(&content)?;
 
         Ok(Self {
             file_mgr,

@@ -5,13 +5,13 @@ extern crate utilities;
 
 use std::sync::Arc;
 
-use engine_backend::nats::BackendNatsServer;
+use engine_backend::BackendServer;
 use utilities::result::Result;
-use utilities::setup::SharedSetup;
+use utilities::setup::CommonSetup;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let setup = Arc::new(SharedSetup::new().await?);
-    let server = BackendNatsServer::new(setup);
+    let setup = Arc::new(CommonSetup::new().await?);
+    let server = BackendServer::new(setup);
     server.listen().await
 }

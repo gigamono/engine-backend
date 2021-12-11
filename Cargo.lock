@@ -322,7 +322,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 
 [[package]]
-name = "engine-backend"
+name = "engine_backend"
 version = "0.1.0"
 dependencies = [
  "bincode",
@@ -1344,8 +1344,10 @@ version = "0.1.0"
 dependencies = [
  "deno_core",
  "downcast-rs",
+ "futures-util",
  "log",
  "path-clean",
+ "regex",
  "serde",
  "tokio",
  "utilities",
