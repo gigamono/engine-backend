@@ -23,16 +23,16 @@ impl Router {
         // Routing.
         if path.starts_with("/r/") {
             // If the path starts with "/r/".
-            return SurlHandler::handle(request, response_tx, setup).await;
+            SurlHandler::handle(request, response_tx, setup).await
         } else if let Ok(_) = http::parse_url_path_number(path) {
             // If the path starts with a number (like "/2/system/load/prometheus/index.css").
-            return SurlHandler::handle(request, response_tx, setup).await;
+            SurlHandler::handle(request, response_tx, setup).await
+        } else {
+            Err(HandlerError::Client {
+                ctx: HandlerErrorMessage::NotFound,
+                code: StatusCode::NOT_FOUND,
+                src: errors::new_error(format!(r#"resource not found "{}""#, path)),
+            })
         }
-
-        Err(HandlerError::Client {
-            ctx: HandlerErrorMessage::NotFound,
-            code: StatusCode::NOT_FOUND,
-            src: errors::new_error(format!(r#"resource not found "{}""#, path)),
-        })
     }
 }

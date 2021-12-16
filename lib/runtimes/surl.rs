@@ -3,7 +3,14 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::files::FileManager;
-use tera::{events::Events, Runtime};
+use tera::{
+    events::Events,
+    permissions::{
+        events::event_http::{HttpEvent, Path},
+        Permissions,
+    },
+    Runtime,
+};
 use utilities::{config::SurlManifest, result::Result};
 
 pub struct SurlRuntime {
@@ -14,6 +21,7 @@ pub struct SurlRuntime {
 
 impl SurlRuntime {
     pub async fn new(file_mgr: FileManager, events: Rc<RefCell<Events>>) -> Result<Self> {
+        // TODO(appcypher): Support permissions.
         // Save Surl manifest.
         let content = file_mgr.read_file_from_surl("surl.yaml").await?;
         let manifest = SurlManifest::try_from(&content)?;
@@ -43,27 +51,27 @@ impl SurlRuntime {
     }
 
     async fn run_auth(&self) -> Result<bool> {
+        // TODO(appcypher): Fs permissions.
         let filename = "/system/auth.js";
         let code = self.file_mgr.read_file(filename).await?;
         let events = Rc::clone(&self.events);
 
         // Execute module.
-        let permissions = Default::default();
-        let mut runtime = Runtime::default_event(permissions, events).await?;
+        let mut runtime = Runtime::default_event(Permissions::default(), events).await?;
         runtime.execute_module(filename, code).await?;
 
         Ok(true) // TODO(appcypher): Check value ok
     }
 
     async fn run_middlewares(&self) -> Result<bool> {
+        // TODO(appcypher): Fs permissions.
         for path in self.manifest.middlewares.iter() {
-            let filename = format!("/middlewares/{}", path);
+            let filename = format!("/middlewares/{}", path.script);
             let code = self.file_mgr.read_file(&filename).await?;
             let events = Rc::clone(&self.events);
 
             // Execute module.
-            let permissions = Default::default();
-            let mut runtime = Runtime::default_event(permissions, events).await?;
+            let mut runtime = Runtime::default_event(Permissions::default(), events).await?;
             runtime.execute_module(filename, code).await?;
 
             // TODO(appcypher): Check value ok
@@ -77,8 +85,16 @@ impl SurlRuntime {
         let code = self.file_mgr.read_file(filename).await?;
         let events = Rc::clone(&self.events);
 
+        // TODO(appcypher): Remove
+        let allow_list = [Path::from("/r/v1/body_json")];
+        let permissions = Permissions::builder()
+            .add_permissions(&[
+                (HttpEvent::ReadRequest, &allow_list),
+                (HttpEvent::SendResponse, &allow_list),
+            ])?
+            .build();
+
         // Execute module.
-        let permissions = Default::default();
         let mut runtime = Runtime::default_event(permissions, events).await?;
         runtime.execute_module(filename, code).await?;
 

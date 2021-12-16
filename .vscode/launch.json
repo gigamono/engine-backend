@@ -7,23 +7,9 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in library 'engine_backend'",
+      "name": "Debug executable 'backend server'",
       "cargo": {
-        "args": ["test", "--no-run", "--lib", "--package=engine-backend"],
-        "filter": {
-          "name": "engine_backend",
-          "kind": "lib"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug executable 'server'",
-      "cargo": {
-        "args": ["build", "--bin=server", "--package=engine-backend"],
+        "args": ["build", "--bin=server", "--package=engine_backend"],
         "filter": {
           "name": "server",
           "kind": "bin"
@@ -35,19 +21,5 @@
         "GIGAMONO_CONFIG_PATH": "../sample/gigamono.yaml"
       }
     },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug unit tests in executable 'server'",
-      "cargo": {
-        "args": ["test", "--no-run", "--bin=server", "--package=engine-backend"],
-        "filter": {
-          "name": "server",
-          "kind": "bin"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    }
   ]
 }

@@ -10,7 +10,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::Builder;
 use tokio::sync::mpsc::{self, Sender};
 use tokio::task::LocalSet;
-use utilities::http::{Body, Request, Response};
+use utilities::http::{self, Body, Request, Response};
 use utilities::result::HandlerResult;
 use utilities::{
     result::{Context, Result},
@@ -100,15 +100,11 @@ impl BackendServer {
         F: FnOnce(&'a Self, &'b TcpListener) -> Fut,
         Fut: Future<Output = ()>,
     {
-        match AssertUnwindSafe(func(self, tcp_listener))
+        if let Err(err) = AssertUnwindSafe(func(self, tcp_listener))
             .catch_unwind()
             .await
         {
-            Ok(_) => (),
-            Err(err) => {
-                // Log error.
-                error!("{:?}", err);
-            }
+            let _ = http::handle_panic_error_t::<()>(err);
         }
     }
 
