@@ -5,12 +5,13 @@ use futures::{Future, FutureExt};
 use log::{error, info};
 use std::rc::Rc;
 use std::thread;
-use std::{net::SocketAddr, panic::AssertUnwindSafe, sync::Arc};
+use std::{panic::AssertUnwindSafe, sync::Arc};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::Builder;
 use tokio::sync::mpsc::{self, Sender};
 use tokio::task::LocalSet;
 use utilities::http::{self, Body, Request, Response};
+use utilities::ip;
 use utilities::result::HandlerResult;
 use utilities::{
     result::{Context, Result},
@@ -31,8 +32,7 @@ impl BackendServer {
         env_logger::init();
 
         // Get socket address.
-        let socket_address = &self.setup.config.engines.backend.socket_address;
-        let addr: SocketAddr = socket_address.parse()?;
+        let addr = ip::parse_socket_address(&self.setup.config.engines.backend.socket_address)?;
 
         info!(r#"Socket address = "{}""#, addr);
 
