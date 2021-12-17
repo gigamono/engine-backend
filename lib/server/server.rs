@@ -30,9 +30,9 @@ impl BackendServer {
         // Initialize logger.
         env_logger::init();
 
-        // Get port info and create socket address.
-        let port = self.setup.config.engines.backend.port;
-        let addr = SocketAddr::from(([127, 0, 0, 1], port));
+        // Get socket address.
+        let socket_address = &self.setup.config.engines.backend.socket_address;
+        let addr: SocketAddr = socket_address.parse()?;
 
         info!(r#"Socket address = "{}""#, addr);
 
