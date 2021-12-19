@@ -10,8 +10,8 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::Builder;
 use tokio::sync::mpsc::{self, Sender};
 use tokio::task::LocalSet;
-use utilities::http::{self, Body, Request, Response};
-use utilities::ip;
+use utilities::hyper::{Body, Request, Response};
+use utilities::{ip, http};
 use utilities::result::HandlerResult;
 use utilities::{
     result::{Context, Result},
@@ -54,6 +54,7 @@ impl BackendServer {
         // Clone setup object.
         let setup = Arc::clone(&self.setup);
 
+        // TODO(appcypher): Need hard or soft limit on thread spawn.
         // Spawn a thread for each client connection.
         thread::spawn(move || {
             // Create a thread local tokio runtime.
@@ -72,17 +73,13 @@ impl BackendServer {
 
     async fn handler(tcp_stream: TcpStream, setup: Arc<CommonSetup>, local: &LocalSet) {
         // Request channel.
-        let (request_tx, mut request_rx) = mpsc::channel(2);
+        let (request_tx, mut request_rx) = mpsc::channel(1);
 
         // Response Channel.
-        let (response_tx, response_rx) = mpsc::channel(2);
+        let (response_tx, response_rx) = mpsc::channel(1);
 
         // Spawn task on local thread.
-        local.spawn_local(HttpDriver::drive(
-            tcp_stream,
-            request_tx.clone(),
-            response_rx,
-        ));
+        local.spawn_local(HttpDriver::drive(tcp_stream, request_tx.clone(), response_rx));
 
         // Route and handle request if there is one.
         if let Some(request) = request_rx.recv().await {

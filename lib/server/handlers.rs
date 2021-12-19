@@ -1,5 +1,5 @@
 // Copyright 2021 the Gigamono authors. All rights reserved. Apache 2.0 license.
 
-mod surl;
+mod api;
 
-pub(crate) use surl::*;
+pub(crate) use api::*;

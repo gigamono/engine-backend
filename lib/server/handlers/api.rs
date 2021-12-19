@@ -1,19 +1,20 @@
 // Copyright 2021 the Gigamono authors. All rights reserved. Apache 2.0 license.
 
-use crate::{files::FileManager, runtimes::SurlRuntime};
+use crate::{files::FileManager, runtimes::ApiRuntime};
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 use tera::events::{Events, HttpEvent, HttpResponder};
 use tokio::sync::mpsc::Sender;
 use utilities::{
     errors::{self, HandlerError, HandlerErrorMessage},
-    http::{self, Body, Request, Response, StatusCode},
+    http,
+    hyper::{Body, Request, Response, StatusCode},
     result::HandlerResult,
     setup::CommonSetup,
 };
 
-pub struct SurlHandler;
+pub struct ApiHandler;
 
-impl SurlHandler {
+impl ApiHandler {
     pub async fn handle(
         request: Request<Body>,
         response_tx: Rc<Sender<Response<Body>>>,
@@ -42,13 +43,13 @@ impl SurlHandler {
             )),
         }));
 
-        // Create surl runner.
-        let surl_rt = SurlRuntime::new(file_mgr, events)
+        // Create api runtime.
+        let api_rt = ApiRuntime::new(file_mgr, events)
             .await
             .map_err(http::internal_error)?;
 
-        // Execute surl.
-        if !surl_rt.execute().await.map_err(http::internal_error)? {
+        // Execute api runtime.
+        if !api_rt.execute().await.map_err(http::internal_error)? {
             // If result is false, then one of auth or middleware failed.
             return Err(HandlerError::Client {
                 ctx: HandlerErrorMessage::AuthMiddleware,

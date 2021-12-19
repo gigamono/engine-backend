@@ -1,9 +1,13 @@
 // Copyright 2021 the Gigamono authors. All rights reserved. Apache 2.0 license.
 
-use log::{debug, error};
+use log::error;
 use std::{cell::RefCell, convert::Infallible, rc::Rc};
 use tokio::{net::TcpStream, sync::mpsc};
-use utilities::http::{Body, Request, Response, rt::Executor, server::conn::Http, service::service_fn};
+use utilities::{
+    errors::{self},
+    http,
+    hyper::{rt::Executor, server::conn::Http, service::service_fn, Body, Request, Response},
+};
 
 #[derive(Clone)]
 struct LocalExecutor;
@@ -23,45 +27,35 @@ impl HttpDriver {
             .with_executor(LocalExecutor)
             .serve_connection(
                 tcp_stream,
-                service_fn(move |request: Request<Body>| {
+                service_fn(move |request| {
                     let request_tx = request_tx.clone();
                     let response_rx = Rc::clone(&response_rx);
 
                     async move {
                         let mut response_rx = response_rx.borrow_mut();
 
-                        // Get futures for sending request and recieving response.
-                        let send_req_fut = request_tx.send(request);
-                        let recv_resp_fut = response_rx.recv();
+                        let mut response =
+                            http::internal_error(errors::new_error("")).as_hyper_response();
 
-                        // TODO(appcyper): Return an internal server error.
-                        let mut response = Response::default();
-                        tokio::select! {
-                            result = send_req_fut => {
-                                if let Err(err) = result {
-                                    error!("{:?}", err);
-                                };
-
-                                // Continue waiting for response
-                                if let Some(resp) = response_rx.recv().await {
-                                    response = resp;
-                                }
-                            }
-                            result = recv_resp_fut => {
-                                if let Some(resp) = result {
-                                    response = resp;
-                                }
-                            }
+                        // Send request.
+                        if let Err(err) = request_tx.send(request).await {
+                            error!("{:?}", err);
+                            return Ok(response);
                         }
 
-                        Ok::<Response<Body>, Infallible>(response)
+                        // Wait for response.
+                        if let Some(resp) = response_rx.recv().await {
+                            response = resp;
+                        } else {
+                            error!("no response recieved");
+                        }
+
+                        Ok::<_, Infallible>(response)
                     }
                 }),
             )
             .await
             .expect("serving connection");
-
-        debug!("Returning the server!");
     }
 }
 

@@ -30,8 +30,8 @@ impl FileManager {
             .context(format!(r#"attempt to read file, "{:?}""#, path))
     }
 
-    pub async fn read_file_from_surl(&self, relative_path: &str) -> Result<String> {
-        let path = self.paths.get_canon_path_from_surl(relative_path).await?;
+    pub async fn read_file_from_api_path(&self, relative_path: &str) -> Result<String> {
+        let path = self.paths.get_canon_path_from_api_path(relative_path).await?;
 
         fs::read_to_string(&path)
             .await

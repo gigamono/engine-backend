@@ -30,7 +30,7 @@ impl WorkspacePaths {
 
         // Get stripped url path.
         let mut url_path = url_path;
-        if let Some(stripped_path) = url_path.strip_prefix("/r/") {
+        if let Some(stripped_path) = url_path.strip_prefix("/api/") {
             url_path = stripped_path;
         }
 
@@ -61,12 +61,12 @@ impl WorkspacePaths {
         Ok(resolved_path)
     }
 
-    pub async fn get_canon_path_from_surl(&self, relative_path: &str) -> Result<PathBuf> {
-        self.get_canon_path(&format!("/surl/{}/{}", self.url_path, relative_path))
+    pub async fn get_canon_path_from_api_path(&self, relative_path: &str) -> Result<PathBuf> {
+        self.get_canon_path(&format!("/api/{}/{}", self.url_path, relative_path))
             .await
     }
 
-    pub fn get_relative_path_from_surl(&self, relative_path: &str) -> String {
-        format!("/surl/{}/{}", self.url_path, relative_path)
+    pub fn get_relative_path_from_api_path(&self, relative_path: &str) -> String {
+        format!("/api/{}/{}", self.url_path, relative_path)
     }
 }
