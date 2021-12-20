@@ -17,7 +17,7 @@ use utilities::{config::ApiManifest, result::Result};
 pub struct ApiRuntime {
     file_mgr: FileManager,
     manifest: ApiManifest,
-    events: Rc<RefCell<Events>>,
+    runtime: Runtime,
 }
 
 impl ApiRuntime {
@@ -26,14 +26,33 @@ impl ApiRuntime {
         let content = file_mgr.read_file_from_api_path("api.yaml").await?;
         let manifest = ApiManifest::try_from(&content)?;
 
+        // TODO(appcypher): Get permissions from config.
+        let http_ev_allow_list = [HttpEventPath::from("/api/v1/*")];
+        let fs_allow_list = [FsPath::from("/auth.js"), FsPath::from("/mine")];
+
+        let permissions = Permissions::builder()
+            .add_state(FsRoot::from(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../sample/workspaces/unreachable"
+            )))
+            .add_permissions(&[
+                (HttpEvent::ReadRequest, &http_ev_allow_list),
+                (HttpEvent::SendResponse, &http_ev_allow_list),
+            ])?
+            .add_permissions(&[(Fs::Open, &fs_allow_list), (Fs::Read, &fs_allow_list)])?
+            .build();
+
+        // Create runtime.
+        let runtime = Runtime::with_events(permissions, events, Default::default()).await?;
+
         Ok(Self {
             file_mgr,
             manifest,
-            events,
+            runtime,
         })
     }
 
-    pub async fn execute(&self) -> Result<bool> {
+    pub async fn execute(&mut self) -> Result<bool> {
         // Run auth if enabled.
         if self.manifest.authentication.enabled {
             if !self.run_auth().await? {
@@ -52,63 +71,74 @@ impl ApiRuntime {
         Ok(true)
     }
 
-    async fn run_auth(&self) -> Result<bool> {
-        // TODO(appcypher): Fs permissions.
+    async fn run_auth(&mut self) -> Result<bool> {
+        // TODO(appcypher): Permissions.
         let filename = "/auth.js";
-        let code = self.file_mgr.read_file(filename).await?;
-        let events = Rc::clone(&self.events);
 
-        // Execute module.
-        let mut runtime = Runtime::default_event(Permissions::default(), events).await?;
-        runtime.execute_module(filename, code).await?;
+        // Scripts are not modules so they all share scopes.
+        // The template around the code is to make sure they run synchronously and to prevent namespace pollution.
+        let code = format!(
+            "\"use strict\"; (function main(){{ \n{}\n }})();",
+            self.file_mgr.read_file(filename).await?
+        );
 
-        Ok(true) // TODO(appcypher): Check value ok
+        // TODO(appcypher): Get permissions from config.
+        let permissions = Permissions::default();
+
+        // Execute script.
+        let value_global = self
+            .runtime
+            .execute_middleware_script(filename, code, permissions)
+            .await?;
+
+        let scope = &mut self.runtime.handle_scope();
+        let value = value_global.open(scope);
+
+        Ok(value.boolean_value(scope))
     }
 
-    async fn run_middlewares(&self) -> Result<bool> {
-        // TODO(appcypher): Fs permissions.
+    async fn run_middlewares(&mut self) -> Result<bool> {
+        // TODO(appcypher):  Permissions.
         for path in self.manifest.middlewares.iter() {
             let filename = &path.script;
-            let code = self.file_mgr.read_file(filename).await?;
-            let events = Rc::clone(&self.events);
 
-            // Execute module.
-            let mut runtime = Runtime::default_event(Permissions::default(), events).await?;
-            runtime.execute_module(filename, code).await?;
+            // Scripts are not modules so they all share scopes.
+            // The template around the code is to make sure they run synchronously and to prevent namespace pollution.
+            let code = format!(
+                "\"use strict\"; (function main(){{ \n{}\n }})();",
+                self.file_mgr.read_file(filename).await?
+            );
 
-            // TODO(appcypher): Check value ok
+            // TODO(appcypher): Get permissions from config.
+            let permissions = Permissions::default();
+
+            // Execute script.
+            let value_global = self
+                .runtime
+                .execute_middleware_script(filename, code, permissions)
+                .await?;
+
+            let scope = &mut self.runtime.handle_scope();
+            let value = value_global.open(scope);
+
+            if !value.boolean_value(scope) {
+                return Ok(false);
+            }
         }
 
         Ok(true)
     }
 
-    pub async fn run_index(&self) -> Result<()> {
+    pub async fn run_index(&mut self) -> Result<()> {
         let filename = &self
             .file_mgr
             .paths
             .get_relative_path_from_api_path("index.js");
+
         let code = self.file_mgr.read_file(filename).await?;
-        let events = Rc::clone(&self.events);
-
-        // TODO(appcypher): Remove
-        let http_ev_allow_list = [HttpEventPath::from("/api/v1/*")];
-        let fs_allow_list = [FsPath::from("/auth.js"), FsPath::from("/mine")];
-
-        let permissions = Permissions::builder()
-            .add_state(FsRoot::from(concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/../sample/workspaces/unreachable"
-            )))
-            .add_permissions(&[
-                (HttpEvent::ReadRequest, &http_ev_allow_list),
-                (HttpEvent::SendResponse, &http_ev_allow_list),
-            ])?
-            .add_permissions(&[(Fs::Open, &fs_allow_list), (Fs::Read, &fs_allow_list)])?
-            .build();
 
         // Execute module.
-        let mut runtime = Runtime::default_event(permissions, events).await?;
-        runtime.execute_module(filename, code).await?;
+        self.runtime.execute_module(filename, code).await?;
 
         Ok(())
     }

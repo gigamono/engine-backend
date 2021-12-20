@@ -44,7 +44,7 @@ impl ApiHandler {
         }));
 
         // Create api runtime.
-        let api_rt = ApiRuntime::new(file_mgr, events)
+        let mut api_rt = ApiRuntime::new(file_mgr, events)
             .await
             .map_err(http::internal_error)?;
 

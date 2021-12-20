@@ -28,5 +28,5 @@ name = "engine_backend"
 path = "lib/lib.rs"
 
 [[bin]]
-name = "server"
+name = "backend_server"
 path = "bin/backend_server.rs"

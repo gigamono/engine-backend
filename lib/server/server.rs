@@ -6,13 +6,15 @@ use log::{error, info};
 use std::rc::Rc;
 use std::thread;
 use std::{panic::AssertUnwindSafe, sync::Arc};
+use tera::errors::JsError;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::Builder;
 use tokio::sync::mpsc::{self, Sender};
 use tokio::task::LocalSet;
-use utilities::hyper::{Body, Request, Response};
-use utilities::{ip, http};
+use utilities::errors::{self, HandlerError, HandlerErrorMessage};
+use utilities::hyper::{Body, Request, Response, StatusCode};
 use utilities::result::HandlerResult;
+use utilities::{http, ip};
 use utilities::{
     result::{Context, Result},
     setup::CommonSetup,
@@ -79,7 +81,11 @@ impl BackendServer {
         let (response_tx, response_rx) = mpsc::channel(1);
 
         // Spawn task on local thread.
-        local.spawn_local(HttpDriver::drive(tcp_stream, request_tx.clone(), response_rx));
+        local.spawn_local(HttpDriver::drive(
+            tcp_stream,
+            request_tx.clone(),
+            response_rx,
+        ));
 
         // Route and handle request if there is one.
         if let Some(request) = request_rx.recv().await {
@@ -118,15 +124,34 @@ impl BackendServer {
         let response_tx = Rc::new(response_tx);
         match func(request, Rc::clone(&response_tx), setup).await {
             Ok(_) => (),
-            Err(err) => {
+            Err(mut err) => {
                 // Log error.
                 error!("{:?}", err.system_error());
 
-                // Send handler error if possible.
-                if let Err(err) = response_tx.send(err.as_hyper_response()).await {
+                // Customize js errors that are permission errors.
+                Self::customize_permission_error(&mut err);
+
+                // Send handler error.
+                // NOTE: This does not work currently. Sent successfully but not recieved.
+                // The issue is related to https://github.com/hyperium/hyper/issues/2723. The hack introduced does not work here.
+                if let Err(err) = response_tx.try_send(err.as_hyper_response()) {
                     error!("{:?}", err);
                 };
             }
         }
+    }
+
+    fn customize_permission_error(mut handler_err: &mut HandlerError) {
+        if let HandlerError::Internal { src, .. } = &mut handler_err {
+            if let Some(js_err) = src.downcast_ref::<JsError>() {
+                if js_err.message.contains("CustomError::Permission") {
+                    *handler_err = HandlerError::Client {
+                        ctx: HandlerErrorMessage::AuthMiddleware,
+                        code: StatusCode::UNAUTHORIZED,
+                        src: errors::new_error("permission error from JavaScript land"),
+                    };
+                }
+            }
+        };
     }
 }
