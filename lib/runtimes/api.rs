@@ -33,7 +33,11 @@ impl ApiRuntime {
 
         // TODO(appcypher): Get permissions from config.
         let http_ev_allow_list = [HttpEventPath::from("/api/v1/*")];
-        let fs_allow_list = [FsPath::from("/auth.js"), FsPath::from("/mine"), FsPath::from("/mine")];
+        let fs_allow_list = [
+            FsPath::from("/auth.js"),
+            FsPath::from("/mine"),
+            FsPath::from("/apps/frontend@v0.1")
+        ];
 
         let permissions = Permissions::builder()
             .add_state(FsRoot::from(concat!(

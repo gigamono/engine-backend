@@ -90,11 +90,11 @@ impl BackendServer {
         // Route and handle request if there is one.
         if let Some(request) = request_rx.recv().await {
             Self::handler_error_wrap(Router::route, request, response_tx, setup).await;
-            return;
         }
 
-        error!("No request to handle");
-        unreachable!()
+        // This is here to prevent the runtime started by `local.block_on` from ending early before
+        // the driver has properly handled the response we just sent.
+        request_rx.recv().await.unwrap();
     }
 
     #[inline]
@@ -132,8 +132,6 @@ impl BackendServer {
                 Self::customize_permission_error(&mut err);
 
                 // Send handler error.
-                // NOTE: This does not work currently. Sent successfully but not recieved.
-                // The issue is related to https://github.com/hyperium/hyper/issues/2723. The hack introduced does not work here.
                 if let Err(err) = response_tx.try_send(err.as_hyper_response()) {
                     error!("{:?}", err);
                 };

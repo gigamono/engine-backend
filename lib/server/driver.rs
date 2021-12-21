@@ -22,6 +22,8 @@ impl HttpDriver {
     ) {
         let response_rx = Rc::new(RefCell::new(response_rx));
 
+        let end_request_tx = request_tx.clone();
+
         // Set up http handling context.
         Http::new()
             .with_executor(LocalExecutor)
@@ -56,6 +58,9 @@ impl HttpDriver {
             )
             .await
             .expect("serving connection");
+
+        // This signals the handler to end the runtime as response sent is now handled.
+        end_request_tx.send(Request::default()).await.unwrap();
     }
 }
 
