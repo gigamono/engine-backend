@@ -2,7 +2,7 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-use crate::files::FileManager;
+use crate::root::RootManager;
 use tera::{
     events::Events,
     permissions::{
@@ -15,20 +15,25 @@ use tera::{
 use utilities::{config::ApiManifest, result::Result};
 
 pub struct ApiRuntime {
-    file_mgr: FileManager,
+    root_mgr: RootManager,
+    api_path: String,
     manifest: ApiManifest,
     runtime: Runtime,
 }
 
 impl ApiRuntime {
-    pub async fn new(file_mgr: FileManager, events: Rc<RefCell<Events>>) -> Result<Self> {
+    pub async fn new(
+        api_path: String,
+        root_mgr: RootManager,
+        events: Rc<RefCell<Events>>,
+    ) -> Result<Self> {
         // TODO(appcypher): Support permissions.
-        let content = file_mgr.read_file_from_api_path("api.yaml").await?;
+        let content = root_mgr.read_file_from_workspace(&format!("{}/{}", api_path, "api.yaml"))?;
         let manifest = ApiManifest::try_from(&content)?;
 
         // TODO(appcypher): Get permissions from config.
         let http_ev_allow_list = [HttpEventPath::from("/api/v1/*")];
-        let fs_allow_list = [FsPath::from("/auth.js"), FsPath::from("/mine")];
+        let fs_allow_list = [FsPath::from("/auth.js"), FsPath::from("/mine"), FsPath::from("/mine")];
 
         let permissions = Permissions::builder()
             .add_state(FsRoot::from(concat!(
@@ -43,10 +48,11 @@ impl ApiRuntime {
             .build();
 
         // Create runtime.
-        let runtime = Runtime::with_events(permissions, events, Default::default()).await?;
+        let runtime = Runtime::with_events(permissions, events, true, Default::default()).await?;
 
         Ok(Self {
-            file_mgr,
+            api_path,
+            root_mgr,
             manifest,
             runtime,
         })
@@ -73,14 +79,11 @@ impl ApiRuntime {
 
     async fn run_auth(&mut self) -> Result<bool> {
         // TODO(appcypher): Permissions.
-        let filename = "/auth.js";
+        let filepath = "/auth.js";
 
         // Scripts are not modules so they all share scopes.
         // The template around the code is to make sure they run synchronously and to prevent namespace pollution.
-        let code = format!(
-            "\"use strict\"; (function main(){{ \n{}\n }})();",
-            self.file_mgr.read_file(filename).await?
-        );
+        let code = Self::format_code(&self.root_mgr.read_file_from_workspace(filepath)?);
 
         // TODO(appcypher): Get permissions from config.
         let permissions = Permissions::default();
@@ -88,7 +91,7 @@ impl ApiRuntime {
         // Execute script.
         let value_global = self
             .runtime
-            .execute_middleware_script(filename, code, permissions)
+            .execute_middleware_script(filepath, code, permissions)
             .await?;
 
         let scope = &mut self.runtime.handle_scope();
@@ -100,14 +103,11 @@ impl ApiRuntime {
     async fn run_middlewares(&mut self) -> Result<bool> {
         // TODO(appcypher):  Permissions.
         for path in self.manifest.middlewares.iter() {
-            let filename = &path.script;
+            let filepath = &path.script;
 
             // Scripts are not modules so they all share scopes.
             // The template around the code is to make sure they run synchronously and to prevent namespace pollution.
-            let code = format!(
-                "\"use strict\"; (function main(){{ \n{}\n }})();",
-                self.file_mgr.read_file(filename).await?
-            );
+            let code = Self::format_code(&self.root_mgr.read_file_from_workspace(filepath)?);
 
             // TODO(appcypher): Get permissions from config.
             let permissions = Permissions::default();
@@ -115,7 +115,7 @@ impl ApiRuntime {
             // Execute script.
             let value_global = self
                 .runtime
-                .execute_middleware_script(filename, code, permissions)
+                .execute_middleware_script(filepath, code, permissions)
                 .await?;
 
             let scope = &mut self.runtime.handle_scope();
@@ -130,16 +130,19 @@ impl ApiRuntime {
     }
 
     pub async fn run_index(&mut self) -> Result<()> {
-        let filename = &self
-            .file_mgr
-            .paths
-            .get_relative_path_from_api_path("index.js");
+        let filepath = &format!("{}/index.js", self.api_path);
 
-        let code = self.file_mgr.read_file(filename).await?;
+        let code = &self.root_mgr.read_file_from_workspace(filepath)?;
 
         // Execute module.
-        self.runtime.execute_module(filename, code).await?;
+        self.runtime.execute_module(filepath, code).await?;
 
         Ok(())
+    }
+
+    fn format_code(code: &str) -> String {
+        // SEC: Note that there still ways to leak things into the global scope. https://gist.github.com/appcypher/2c210cd04774f1812a4b3e5c84496858
+        // Not sure if this is a critical security issue yet.
+        format!("\"use strict\"; (\n{} \n)();", code)
     }
 }

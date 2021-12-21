@@ -1,6 +1,6 @@
 // Copyright 2021 the Gigamono authors. All rights reserved. Apache 2.0 license.
 
-use crate::{files::FileManager, runtimes::ApiRuntime};
+use crate::{root::RootManager, runtimes::ApiRuntime};
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 use tera::events::{Events, HttpEvent, HttpResponder};
 use tokio::sync::mpsc::Sender;
@@ -28,14 +28,13 @@ impl ApiHandler {
             .map_err(http::internal_error)?;
 
         // Get url path.
-        let url_path = request.uri().path();
+        let url_path = request.uri().path().to_string();
 
-        // Create file manager.
-        let file_mgr = FileManager::new(&workspace_id, &url_path, config)
-            .await
+        // Create root manager.
+        let root_mgr = RootManager::new(&config.engines.backend.root_path, &workspace_id)
             .map_err(http::internal_error)?;
 
-        // Events.
+        // Create events.
         let events = Rc::new(RefCell::new(Events {
             http: Some(HttpEvent::new(
                 request,
@@ -44,7 +43,7 @@ impl ApiHandler {
         }));
 
         // Create api runtime.
-        let mut api_rt = ApiRuntime::new(file_mgr, events)
+        let mut api_rt = ApiRuntime::new(url_path, root_mgr, events)
             .await
             .map_err(http::internal_error)?;
 
