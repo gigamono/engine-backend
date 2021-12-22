@@ -12,7 +12,10 @@ use tera::{
     },
     Runtime,
 };
-use utilities::{config::ApiManifest, result::Result};
+use utilities::{
+    config::{ApiManifest, GigamonoConfig},
+    result::Result,
+};
 
 pub struct ApiRuntime {
     root_mgr: RootManager,
@@ -26,17 +29,16 @@ impl ApiRuntime {
         api_path: String,
         root_mgr: RootManager,
         events: Rc<RefCell<Events>>,
+        config: &GigamonoConfig,
     ) -> Result<Self> {
-        // TODO(appcypher): Support permissions.
         let content = root_mgr.read_file_from_workspace(&format!("{}/{}", api_path, "api.yaml"))?;
         let manifest = ApiManifest::try_from(&content)?;
 
         // TODO(appcypher): Get permissions from config.
-        let http_ev_allow_list = [HttpEventPath::from("/api/v1/*")];
+        let http_ev_allow_list = [HttpEventPath::from("/api/v1/**")];
         let fs_allow_list = [
             FsPath::from("/auth.js"),
-            FsPath::from("/mine"),
-            FsPath::from("/apps/frontend@v0.1")
+            FsPath::from("/apps/frontend@v0.1/dist"),
         ];
 
         let permissions = Permissions::builder()
@@ -52,7 +54,13 @@ impl ApiRuntime {
             .build();
 
         // Create runtime.
-        let runtime = Runtime::with_events(permissions, events, true, Default::default()).await?;
+        let runtime = Runtime::with_events(
+            permissions,
+            events,
+            config.engines.backend.runtime.enable_snapshot,
+            Default::default(),
+        )
+        .await?;
 
         Ok(Self {
             api_path,
