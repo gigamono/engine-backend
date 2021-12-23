@@ -1,29 +1,36 @@
 // Copyright 2021 the Gigamono authors. All rights reserved. Apache 2.0 license.
 
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 use utilities::{
     errors,
     result::{Context, Result},
 };
 
+/// Manages files in the workspace root.
 #[derive(Clone)]
 pub struct RootManager {
-    canon_workspace_path: PathBuf,
+    pub canon_workspace_path: PathBuf,
 }
 
+/// Common paths that are relative to the workspace root.
 pub enum RootLevel {
-    Workspace,
     Api,
+    ApiSystem,
     Apps,
     Extensions,
     Scheduled,
 }
 
 impl RootManager {
+    /// Creates a new root manager.
     pub fn new(backend_root: &str, workspace_id: &str) -> Result<Self> {
-        let workspace_path = &format!("{}/workspaces/{}", backend_root, workspace_id);
-        let canon_workspace_path = fs::canonicalize(workspace_path).context(format!(
-            r#"getting canonical workspace path from, "{}""#,
+        let workspace_path: PathBuf = [backend_root, "workspaces", workspace_id].iter().collect();
+
+        let canon_workspace_path = fs::canonicalize(&workspace_path).context(format!(
+            r#"getting canonical workspace path from {:?}"#,
             workspace_path
         ))?;
 
@@ -32,32 +39,53 @@ impl RootManager {
         })
     }
 
-    pub fn read_file_from(&self, path: &str, level: RootLevel) -> Result<String> {
-        self.read_file(&format!(
-            "{}/{}/{}",
-            self.canon_workspace_path.display(),
-            level.get_path(),
-            path
-        ))
+    /// Reads file from a path realative to `level`.
+    ///
+    /// Does not want specified path to be preceded by a path separator.
+    pub fn read_file_from(&self, path: &Path, level: RootLevel) -> Result<String> {
+        // Join paths.
+        let path: PathBuf = [
+            &self.canon_workspace_path,
+            &level.get_path(),
+            &PathBuf::from(path),
+        ]
+        .iter()
+        .collect();
+
+        self.read_file(&path)
     }
 
-    pub fn read_file_from_workspace(&self, path: &str) -> Result<String> {
-        self.read_file(&format!("{}/{}", self.canon_workspace_path.display(), path))
+    /// Reads file from a path relative to the workspace root.
+    ///
+    /// Does not want specified path to be preceded by a path separator.
+    pub fn read_file_from_workspace(&self, path: &Path) -> Result<String> {
+        // Join paths.
+        let path: PathBuf = [&self.canon_workspace_path, &PathBuf::from(path)]
+            .iter()
+            .collect();
+
+        self.read_file(&path)
     }
 
-    fn read_file(&self, full_path: &str) -> Result<String> {
+    /// Reads file from a path.
+    ///
+    /// Expects an absolute path.
+    fn read_file(&self, full_path: &Path) -> Result<String> {
         // Validate path.
         let canon_path = self.validate_path(full_path)?;
 
         // Read file.
         fs::read_to_string(&canon_path)
-            .context(format!(r#"attempt to read file, "{:?}""#, canon_path))
+            .context(format!(r#"attempt to read file {:?}"#, canon_path))
     }
 
-    fn validate_path(&self, path: &str) -> Result<PathBuf> {
-        // Canonicalize path.
-        let canon_path = fs::canonicalize(path)
-            .context(format!(r#"getting canonical path from, "{}""#, path))?;
+    /// Checks that specified path is still within the workspace root.
+    fn validate_path(&self, path: &Path) -> Result<PathBuf> {
+        // SEC: Canonicalize path.
+        let canon_path = fs::canonicalize(path).context(format!(
+            r#"getting canonical path from {:?}"#,
+            path.display()
+        ))?;
 
         // SEC: Making sure workspace paths is still base.
         if !canon_path.starts_with(&self.canon_workspace_path) {
@@ -72,13 +100,14 @@ impl RootManager {
 }
 
 impl RootLevel {
-    pub fn get_path(&self) -> String {
+    /// Gets the corresponding path (relative to workspace root) of specified variant.
+    pub fn get_path(&self) -> PathBuf {
         match self {
-            RootLevel::Workspace => String::new(),
-            RootLevel::Api => String::from("api"),
-            RootLevel::Apps => String::from("apps"),
-            RootLevel::Extensions => String::from("extensions"),
-            RootLevel::Scheduled => String::from("scheduled"),
+            RootLevel::Api => PathBuf::from("api"),
+            RootLevel::ApiSystem => ["api", "system"].iter().collect::<PathBuf>(),
+            RootLevel::Apps => PathBuf::from("apps"),
+            RootLevel::Extensions => PathBuf::from("extensions"),
+            RootLevel::Scheduled => PathBuf::from("scheduled"),
         }
     }
 }

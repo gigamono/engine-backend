@@ -1,8 +1,7 @@
 // Copyright 2021 the Gigamono authors. All rights reserved. Apache 2.0 license.
 
-use crate::{root::RootManager, runtimes::ApiRuntime};
-use std::{cell::RefCell, rc::Rc, sync::Arc};
-use tera::events::{Events, HttpEvent, HttpResponder};
+use crate::runtimes::ApiRuntime;
+use std::{rc::Rc, sync::Arc};
 use tokio::sync::mpsc::Sender;
 use utilities::{
     errors::{self, HandlerError, HandlerErrorMessage},
@@ -12,38 +11,18 @@ use utilities::{
     setup::CommonSetup,
 };
 
+/// The /api/ route handler.
 pub struct ApiHandler;
 
 impl ApiHandler {
+    /// Starts the runtime that eventually executes the user-defined /api/ handler.
     pub async fn handle(
         request: Request<Body>,
         response_tx: Rc<Sender<Response<Body>>>,
         setup: Arc<CommonSetup>,
     ) -> HandlerResult<()> {
-        // Get config.
-        let config = &setup.config;
-
-        // Get workspace id.
-        let workspace_id = http::get_header_value(&request, http::WORKSPACE_ID_HEADER)
-            .map_err(http::internal_error)?;
-
-        // Get url path.
-        let url_path = request.uri().path().to_string();
-
-        // Create root manager.
-        let root_mgr = RootManager::new(&config.engines.backend.root_path, &workspace_id)
-            .map_err(http::internal_error)?;
-
-        // Create events.
-        let events = Rc::new(RefCell::new(Events {
-            http: Some(HttpEvent::new(
-                request,
-                Rc::new(HttpResponder::new(response_tx)),
-            )),
-        }));
-
         // Create api runtime.
-        let mut api_rt = ApiRuntime::new(url_path, root_mgr, events, &config)
+        let mut api_rt = ApiRuntime::new(request, response_tx, setup)
             .await
             .map_err(http::internal_error)?;
 
