@@ -2,22 +2,17 @@
 
 use std::{
     cell::RefCell,
-    convert::TryFrom,
     path::{self, PathBuf},
     rc::Rc,
     sync::Arc,
 };
 
-use crate::root::RootManager;
+use crate::{root::RootManager, runtimes::ApiPermissions};
 use log::debug;
 use regex::Regex;
 use tera::{
     events::{Events, HttpResponder},
-    permissions::{
-        events::event_http::HttpEvent,
-        fs::{Fs, FsPath, FsRoot},
-        Permissions,
-    },
+    permissions::Permissions,
     Runtime,
 };
 use tokio::sync::mpsc::Sender;
@@ -75,18 +70,12 @@ impl ApiRuntime {
         let content = root_mgr
             .read_file_from_workspace(&[&folder_path, "api.yaml"].iter().collect::<PathBuf>())?;
 
+        // Parse manifest.
         let manifest = ApiManifest::try_from(&content)?;
 
-        // TODO(appcypher): Remove this!!! Get permissions from config instead.
-        let fs_allow_list = [FsPath::from("auth.js"), FsPath::from("apps")];
-        let permissions = Permissions::builder()
-            .add_state(FsRoot::try_from(&root_mgr.canon_workspace_path)?)
-            .add_permissions(&[HttpEvent::ReadRequest, HttpEvent::SendResponse])?
-            .add_permissions_with_allow_list(&[
-                (Fs::Open, &fs_allow_list),
-                (Fs::Read, &fs_allow_list),
-            ])?
-            .build();
+        // Get permissions.
+        let permissions =
+            ApiPermissions::load_permissions(&manifest, &root_mgr.canon_workspace_path)?;
 
         // Create runtime.
         let runtime = Runtime::with_events(
