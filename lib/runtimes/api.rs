@@ -204,11 +204,7 @@ impl ApiRuntime {
         let platform_path = &Self::to_platform_path(url_path)?;
 
         // SEC: Get regex pattern of current platform's separator.
-        let re_sep = if cfg!(windows) {
-            String::from(r"\\")
-        } else {
-            String::from(path::MAIN_SEPARATOR)
-        };
+        let re_sep = utilities::path::get_platform_sep_pattern();
 
         // Pattern that matches path param like `\=foo\` in `C:\\Users\=foo\name`.
         let pattern = format!(r"{}=[^{}]*{}?", re_sep, re_sep, re_sep);
