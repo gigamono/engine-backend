@@ -2,7 +2,7 @@
 
 use std::{
     cell::RefCell,
-    path::{self, PathBuf},
+    path::{self, Path, PathBuf},
     rc::Rc,
     sync::Arc,
 };
@@ -19,7 +19,7 @@ use tokio::sync::mpsc::Sender;
 use utilities::{
     config::ApiManifest,
     errors, http,
-    hyper::{Body, Request, Response},
+    hyper::{Body, Method, Request, Response},
     result::Result,
     setup::CommonSetup,
 };
@@ -32,6 +32,7 @@ pub struct ApiRuntime {
     root_mgr: RootManager,
     manifest: ApiManifest,
     runtime: Runtime,
+    method: Method,
 }
 
 impl ApiRuntime {
@@ -49,6 +50,9 @@ impl ApiRuntime {
 
         // Get url path.
         let url_path = request.uri().path().to_string();
+
+        // Get request method. Used to determine the index script to run.
+        let method = request.method().to_owned();
 
         // Create root manager.
         let root_mgr = RootManager::new(&config.engines.backend.root_path, &workspace_id)?;
@@ -91,10 +95,11 @@ impl ApiRuntime {
             root_mgr,
             manifest,
             runtime,
+            method,
         })
     }
 
-    /// Executes the auth script (if enabled), the middleware scripts and the associated `index.js` module of the api.
+    /// Executes the auth script (if enabled), the middleware scripts and the associated index module of the api.
     pub async fn execute(&mut self) -> Result<bool> {
         // Run auth if enabled.
         if self.manifest.authentication.enabled {
@@ -176,10 +181,32 @@ impl ApiRuntime {
         Ok(true)
     }
 
-    /// Executes the `index.js` module that corresponds to the api in topic.
+    /// Executes the index module that corresponds to the api in topic.
     pub async fn run_index(&mut self) -> Result<()> {
-        let filepath: PathBuf = [&self.folder_path, "index.js"].iter().collect();
+        // Get specialised path for http method or just "index.js" if it does not exist.
+        let filepath = if self.method == Method::GET {
+            self.get_method_index_path("get")
+        } else if self.method == Method::POST {
+            self.get_method_index_path("post")
+        } else if self.method == Method::PUT {
+            self.get_method_index_path("put")
+        } else if self.method == Method::DELETE {
+            self.get_method_index_path("delete")
+        } else if self.method == Method::HEAD {
+            self.get_method_index_path("head")
+        } else if self.method == Method::OPTIONS {
+            self.get_method_index_path("options")
+        } else if self.method == Method::CONNECT {
+            self.get_method_index_path("connect")
+        } else if self.method == Method::PATCH {
+            self.get_method_index_path("patch")
+        } else if self.method == Method::TRACE {
+            self.get_method_index_path("trace")
+        } else {
+            [&self.folder_path, "index.js"].iter().collect::<PathBuf>()
+        };
 
+        // Grab code from file.
         let code = &self.root_mgr.read_file_from_workspace(&filepath)?;
 
         // Execute module.
@@ -188,6 +215,27 @@ impl ApiRuntime {
             .await?;
 
         Ok(())
+    }
+
+    /// Gets a specialised index module path based on the request's http method.
+    /// For example, if the request has a GET method, the index module will be `"index.get.js"` or `"index.js"` if that does not exist.
+    ///
+    /// Falls back to `"index.js"` if specialised path does not exist.
+    fn get_method_index_path(&self, method: &str) -> PathBuf {
+        let relative_path: PathBuf = [&self.folder_path, &format!("index.{}.js", method)]
+            .iter()
+            .collect();
+
+        let full_path: PathBuf = [&self.root_mgr.canon_workspace_path, &relative_path]
+            .iter()
+            .collect();
+
+        // Check that full path exists.
+        if Path::new(&full_path).exists() {
+            relative_path
+        } else {
+            [&self.folder_path, "index.js"].iter().collect()
+        }
     }
 
     /// Adds code string within an iife syntax to prevent accidental leak of data to global space.
