@@ -54,6 +54,8 @@ impl ApiRuntime {
         // Get request method. Used to determine the index script to run.
         let method = request.method().to_owned();
 
+        debug!("Request path = {}", url_path);
+
         // Create root manager.
         let root_mgr = RootManager::new(&config.engines.backend.root_path, &workspace_id)?;
 
@@ -206,6 +208,8 @@ impl ApiRuntime {
             [&self.folder_path, "index.js"].iter().collect::<PathBuf>()
         };
 
+        debug!("Index filepath = {}", filepath.display());
+
         // Grab code from file.
         let code = &self.root_mgr.read_file_from_workspace(&filepath)?;
 
@@ -262,8 +266,10 @@ impl ApiRuntime {
         let replace = format!(r"{}={}", path::MAIN_SEPARATOR, path::MAIN_SEPARATOR);
         let resolved_param_path = re.replace_all(platform_path, replace);
 
-        // NOTE: Remove trailing `=` path. This is because a path that ends like should always be handled by its parent directory.
-        // SEC: Since we are only trimming it is not possible to `../{workspace_root}`.
+        debug!("Resolved param path = {}", &resolved_param_path);
+
+        // Remove trailing `=` in path. This is because a resolved path that ends with `=` should be handled by its parent directory.
+        // NOTE: SEC: Since we are only trimming, it is not possible to `../{workspace_root}`.
         let resolved_param_path = resolved_param_path
             .trim_end_matches(path::MAIN_SEPARATOR)
             .trim_end_matches('=');

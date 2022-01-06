@@ -36,6 +36,7 @@ impl ApiPermissions {
             Self::add_permission_if_exists(&permissions.fs.create, Fs::Create.into(), &mut result);
             Self::add_permission_if_exists(&permissions.fs.read, Fs::Read.into(), &mut result);
             Self::add_permission_if_exists(&permissions.fs.write, Fs::Write.into(), &mut result);
+            Self::add_permission_if_exists(&permissions.fs.execute, Fs::Execute.into(), &mut result);
 
             return result;
         };
