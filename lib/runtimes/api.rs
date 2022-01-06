@@ -28,7 +28,7 @@ use utilities::{
 ///
 /// The runtime expects to find the request url path mapped directly to a similar-looking path in the workspace root.
 pub struct ApiRuntime {
-    folder_path: String,
+    relative_folder_path: String,
     root_mgr: RootManager,
     manifest: ApiManifest,
     runtime: Runtime,
@@ -60,9 +60,9 @@ impl ApiRuntime {
         let root_mgr = RootManager::new(&config.engines.backend.root_path, &workspace_id)?;
 
         // Resolve path params.
-        let folder_path = Self::resolve_url_path(&url_path)?;
+        let relative_folder_path = Self::resolve_url_path(&url_path)?;
 
-        debug!("Resolved url path = {}", &folder_path);
+        debug!("Resolved url path = {}", &relative_folder_path);
 
         // Create events.
         let events = Rc::new(RefCell::new(Events {
@@ -73,8 +73,11 @@ impl ApiRuntime {
         }));
 
         // Parse the api manifest.
-        let content = root_mgr
-            .read_file_from_workspace(&[&folder_path, "api.yaml"].iter().collect::<PathBuf>())?;
+        let content = root_mgr.read_file_from_workspace(
+            &[&relative_folder_path, "api.yaml"]
+                .iter()
+                .collect::<PathBuf>(),
+        )?;
 
         // Parse manifest.
         let manifest = ApiManifest::try_from(&content)?;
@@ -93,7 +96,7 @@ impl ApiRuntime {
         .await?;
 
         Ok(Self {
-            folder_path,
+            relative_folder_path,
             root_mgr,
             manifest,
             runtime,
@@ -186,36 +189,34 @@ impl ApiRuntime {
     /// Executes the index module that corresponds to the api in topic.
     pub async fn run_index(&mut self) -> Result<()> {
         // Get specialised path for http method or just "index.js" if it does not exist.
-        let filepath = if self.method == Method::GET {
-            self.get_method_index_path("get")
-        } else if self.method == Method::POST {
-            self.get_method_index_path("post")
-        } else if self.method == Method::PUT {
-            self.get_method_index_path("put")
-        } else if self.method == Method::DELETE {
-            self.get_method_index_path("delete")
-        } else if self.method == Method::HEAD {
-            self.get_method_index_path("head")
-        } else if self.method == Method::OPTIONS {
-            self.get_method_index_path("options")
-        } else if self.method == Method::CONNECT {
-            self.get_method_index_path("connect")
-        } else if self.method == Method::PATCH {
-            self.get_method_index_path("patch")
-        } else if self.method == Method::TRACE {
-            self.get_method_index_path("trace")
-        } else {
-            [&self.folder_path, "index.js"].iter().collect::<PathBuf>()
+        let filepath = match self.method {
+            Method::GET => self.get_method_index_path("get"),
+            Method::POST => self.get_method_index_path("post"),
+            Method::PUT => self.get_method_index_path("put"),
+            Method::DELETE => self.get_method_index_path("delete"),
+            Method::HEAD => self.get_method_index_path("head"),
+            Method::OPTIONS => self.get_method_index_path("options"),
+            Method::CONNECT => self.get_method_index_path("connect"),
+            Method::PATCH => self.get_method_index_path("patch"),
+            Method::TRACE => self.get_method_index_path("trace"),
+            _ => [&self.relative_folder_path, "index.js"].iter().collect(),
         };
 
-        debug!("Index filepath = {}", filepath.display());
+        debug!("Index relative filepath = {}", filepath.display());
 
         // Grab code from file.
         let code = &self.root_mgr.read_file_from_workspace(&filepath)?;
 
+        // Make index path absolute.
+        let abs_path: PathBuf = [&PathBuf::from(path::MAIN_SEPARATOR.to_string()), &filepath]
+            .iter()
+            .collect();
+
+        debug!("Index absolute filepath = {}", abs_path.display());
+
         // Execute module.
         self.runtime
-            .execute_module(filepath.display().to_string(), code)
+            .execute_module(abs_path.display().to_string(), code)
             .await?;
 
         Ok(())
@@ -226,7 +227,7 @@ impl ApiRuntime {
     ///
     /// Falls back to `"index.js"` if specialised path does not exist.
     fn get_method_index_path(&self, method: &str) -> PathBuf {
-        let relative_path: PathBuf = [&self.folder_path, &format!("index.{}.js", method)]
+        let relative_path: PathBuf = [&self.relative_folder_path, &format!("index.{}.js", method)]
             .iter()
             .collect();
 
@@ -238,7 +239,7 @@ impl ApiRuntime {
         if Path::new(&full_path).exists() {
             relative_path
         } else {
-            [&self.folder_path, "index.js"].iter().collect()
+            [&self.relative_folder_path, "index.js"].iter().collect()
         }
     }
 
@@ -281,13 +282,13 @@ impl ApiRuntime {
             .to_string())
     }
 
-    /// Converts url path to platform path (using the platfroms separator)
+    /// Converts url path to platform path (using the platform's main separator)
     ///
     /// Windows path separator is not allowed in url.
     fn to_platform_path(url_path: &str) -> Result<String> {
         // SEC: Check if there is windows path separator in the url.
         if url_path.contains(r"\") {
-            return errors::new_error_t(r"the `\` character is not allowed in a url");
+            return errors::new_error_t(r"the `\` character is not supported in a url");
         }
 
         if !cfg!(unix) {
