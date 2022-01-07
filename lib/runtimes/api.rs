@@ -202,7 +202,7 @@ impl ApiRuntime {
             _ => [&self.relative_folder_path, "index.js"].iter().collect(),
         };
 
-        debug!("Index relative filepath = {}", filepath.display());
+        debug!("Index relative filepath = {:?}", filepath);
 
         // Grab code from file.
         let code = &self.root_mgr.read_file_from_workspace(&filepath)?;
@@ -212,7 +212,7 @@ impl ApiRuntime {
             .iter()
             .collect();
 
-        debug!("Index absolute filepath = {}", abs_path.display());
+        debug!("Index absolute filepath = {:?}", abs_path);
 
         // Execute module.
         self.runtime

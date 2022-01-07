@@ -75,17 +75,14 @@ impl RootManager {
         let canon_path = self.validate_path(full_path)?;
 
         // Read file.
-        fs::read_to_string(&canon_path)
-            .context(format!(r#"attempt to read file {:?}"#, canon_path))
+        fs::read_to_string(&canon_path).context(format!(r#"attempt to read file {:?}"#, canon_path))
     }
 
     /// Checks that specified path is still within the workspace root.
     fn validate_path(&self, path: &Path) -> Result<PathBuf> {
         // SEC: Canonicalize path.
-        let canon_path = fs::canonicalize(path).context(format!(
-            r#"getting canonical path from {:?}"#,
-            path.display()
-        ))?;
+        let canon_path =
+            fs::canonicalize(path).context(format!(r#"getting canonical path from {:?}"#, path))?;
 
         // SEC: Making sure workspace paths is still base.
         if !canon_path.starts_with(&self.canon_workspace_path) {
