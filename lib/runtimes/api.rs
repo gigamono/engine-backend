@@ -1,4 +1,4 @@
-// Copyright 2021 the Gigamono authors. All rights reserved. Apache 2.0 license.
+// Copyright 2021 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
 use std::{
     cell::RefCell,
@@ -13,7 +13,7 @@ use regex::Regex;
 use tera::{
     events::{Events, HttpResponder},
     permissions::Permissions,
-    Runtime,
+    Runtime, RuntimeOptions,
 };
 use tokio::sync::mpsc::Sender;
 use utilities::{
@@ -86,12 +86,19 @@ impl ApiRuntime {
         let permissions =
             ApiPermissions::load_permissions(&manifest, &root_mgr.canon_workspace_path)?;
 
+        // TODO(appcypher): ...
+        // Get custom postcripts.
+        let custom_postscripts = vec![];
+
         // Create runtime.
         let runtime = Runtime::with_events(
             permissions,
             events,
             config.engines.backend.runtime.enable_snapshot,
-            Default::default(),
+            custom_postscripts,
+            RuntimeOptions {
+                ..Default::default()
+            },
         )
         .await?;
 

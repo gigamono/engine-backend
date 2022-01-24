@@ -1,4 +1,4 @@
-// Copyright 2021 the Gigamono authors. All rights reserved. Apache 2.0 license.
+// Copyright 2021 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
 use std::{convert::TryFrom, path::Path};
 
@@ -52,12 +52,12 @@ impl ApiPermissions {
         if let Some(permissions) = &api_manifest.permissions {
             let mut result: Vec<Box<dyn PermissionType>> = vec![];
 
-            if permissions.http_event.read_request {
-                result.push(HttpEvent::ReadRequest.into())
+            if permissions.http_event.request_read {
+                result.push(HttpEvent::RequestRead.into())
             }
 
-            if permissions.http_event.send_response {
-                result.push(HttpEvent::SendResponse.into())
+            if permissions.http_event.response_send {
+                result.push(HttpEvent::ResponseSend.into())
             }
 
             return result;
