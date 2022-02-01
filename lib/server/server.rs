@@ -3,6 +3,7 @@
 use crate::{HttpDriver, Router};
 use futures::{Future, FutureExt};
 use log::{error, info};
+use mysql::*;
 use std::rc::Rc;
 use std::thread;
 use std::{panic::AssertUnwindSafe, sync::Arc};
@@ -22,17 +23,22 @@ use utilities::{
 
 pub struct BackendServer {
     setup: Arc<CommonSetup>,
+    db_pool: Pool,
 }
 
 impl BackendServer {
-    pub fn new(setup: Arc<CommonSetup>) -> Self {
-        Self { setup }
+    pub fn new(setup: Arc<CommonSetup>) -> Result<Self> {
+        // Connect to MySQL database.
+        let db_url = &setup.as_ref().config.engines.backend.db_url;
+        let opts = Opts::from_url(db_url.as_str())?;
+        let db_pool = Pool::new(opts)?;
+
+        info!(r#"Created database pool for = "{}""#, db_url);
+        
+        Ok(Self { setup, db_pool })
     }
 
     pub async fn listen(&self) -> Result<()> {
-        // Initialize logger.
-        env_logger::init();
-
         // Get socket address.
         let addr = ip::parse_socket_address(&self.setup.config.engines.backend.socket_address)?;
 
