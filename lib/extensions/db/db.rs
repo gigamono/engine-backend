@@ -13,7 +13,7 @@ use tera::{
 pub fn db(permissions: Rc<RefCell<Permissions>>, db_pool: Rc<Pool>) -> Extension {
     let extension = Extension::builder()
         .js(include_js_files!(
-            prefix "(backend:extensions) ",
+            prefix "(runtime_server:extensions) ",
             "lib/extensions/db/01_db.js",
         ))
         .ops(vec![

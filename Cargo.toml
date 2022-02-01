@@ -1,14 +1,14 @@
 [package]
-name = "engine_backend"
+name = "engine_runtime"
 version = "0.1.0"
 edition = "2018"
 authors = ["Stephen Akinyemi <appcypher@outlook.com>"]
-description = "The backend implementation of Gigamono"
+description = "The serverless implementation of Gigamono"
 readme = "README.md"
-repository = "https://github.com/gigamono/engine_backend"
+repository = "https://github.com/gigamono/engine_runtime"
 keywords = ["no-code", "capabilities", "runtime", "serverless", "deno"]
 categories = ["development-tools", "web-programming"]
-documentation = "https://github.com/gigamono/engine_backend"
+documentation = "https://github.com/gigamono/engine_runtime"
 homepage = "https://gigamono.com"
 license-file = "LICENSE"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -27,9 +27,9 @@ mysql = "22.0.0"
 # libp2p = "0.42.0"
 
 [lib]
-name = "engine_backend"
+name = "engine_runtime"
 path = "lib/lib.rs"
 
 [[bin]]
-name = "backend_server"
-path = "bin/backend_server.rs"
+name = "runtime_server"
+path = "bin/runtime_server.rs"

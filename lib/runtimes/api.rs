@@ -57,7 +57,7 @@ impl ApiRuntime {
         debug!("Request path = {}", url_path);
 
         // Create root manager.
-        let root_mgr = RootManager::new(&config.engines.backend.root_path, &workspace_id)?;
+        let root_mgr = RootManager::new(&config.engines.runtime.root_path, &workspace_id)?;
 
         // Resolve path params.
         let relative_folder_path = Self::resolve_url_path(&url_path)?;
@@ -94,7 +94,7 @@ impl ApiRuntime {
         let runtime = Runtime::with_events(
             permissions,
             events,
-            config.engines.backend.runtime.enable_snapshot,
+            config.engines.runtime.js_runtime.enable_snapshot,
             custom_postscripts,
             RuntimeOptions {
                 ..Default::default()

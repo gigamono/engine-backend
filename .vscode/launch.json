@@ -7,9 +7,9 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug executable 'backend server'",
+      "name": "Debug executable 'runtime server'",
       "cargo": {
-        "args": ["build", "--bin=server", "--package=engine_backend"],
+        "args": ["build", "--bin=server", "--package=engine_runtime"],
         "filter": {
           "name": "server",
           "kind": "bin"

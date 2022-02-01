@@ -26,8 +26,8 @@ pub enum RootLevel {
 
 impl RootManager {
     /// Creates a new root manager.
-    pub fn new(backend_root: &str, workspace_id: &str) -> Result<Self> {
-        let workspace_path: PathBuf = [backend_root, "workspaces", workspace_id].iter().collect();
+    pub fn new(root: &str, workspace_id: &str) -> Result<Self> {
+        let workspace_path: PathBuf = [root, "workspaces", workspace_id].iter().collect();
 
         let canon_workspace_path = fs::canonicalize(&workspace_path).context(format!(
             r#"getting canonical workspace path from {:?}"#,

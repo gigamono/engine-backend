@@ -4,7 +4,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use tera::{
     errors::AnyError,
-    extensions::{Extension, OpState, ResourceId},
+    extensions::{Extension, OpState, ResourceId, op_async},
     include_js_files,
     permissions::Permissions,
 };
@@ -12,11 +12,11 @@ use tera::{
 pub fn p2p(permissions: Rc<RefCell<Permissions>>) -> Extension {
     let extension = Extension::builder()
         .js(include_js_files!(
-            prefix "(backend:extensions) ",
+            prefix "(runtime_server:extensions) ",
             "lib/extensions/p2p/01_p2p.js",
         ))
         .ops(vec![
-            // ("opP2pPeerConnect", op_async(op_p2p_peer_connect)),
+            ("opP2pPeerConnect", op_async(op_p2p_peer_connect)),
         ])
         .state(move |state| {
             if !state.has::<Rc<RefCell<Permissions>>>() {
@@ -32,7 +32,7 @@ pub fn p2p(permissions: Rc<RefCell<Permissions>>) -> Extension {
 
 async fn op_p2p_peer_connect(
     _state: Rc<RefCell<OpState>>,
-    rid: ResourceId,
+    _rid: ResourceId,
     _: (),
 ) -> Result<(), AnyError> {
     // TODO(appcypher): Add implementation.
