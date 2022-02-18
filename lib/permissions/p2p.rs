@@ -1,6 +1,6 @@
 // Copyright 2022 the Gigamono authors. All rights reserved. GPL-3.0 License.
 
-use crate::permissions::{PermissionType, PermissionTypeKey};
+use tera::permissions::{PermissionType, PermissionTypeKey};
 use std::any::TypeId;
 
 #[derive(Debug, Clone)]

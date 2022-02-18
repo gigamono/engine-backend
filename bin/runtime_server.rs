@@ -15,6 +15,6 @@ async fn main() -> Result<()> {
     env_logger::init();
 
     let setup = Arc::new(CommonSetup::new().await?);
-    let server = RuntimeServer::new(setup)?;
+    let server = RuntimeServer::new(setup);
     server.listen().await
 }

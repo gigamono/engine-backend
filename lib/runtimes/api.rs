@@ -45,9 +45,6 @@ impl ApiRuntime {
         // Get config.
         let config = &setup.config;
 
-        // Get workspace id.
-        let workspace_id = http::get_header_value(&request, http::WORKSPACE_ID_HEADER)?;
-
         // Get url path.
         let url_path = request.uri().path().to_string();
 
@@ -56,8 +53,15 @@ impl ApiRuntime {
 
         debug!("Request path = {}", url_path);
 
+        // Check if we can map multiple workspaces to a volume or db.
+        let workspace_id = if config.volume.multi_workspace || config.db.multi_workspace {
+            http::get_header_value(&request, http::WORKSPACE_ID_HEADER)?
+        } else {
+            String::new()
+        };
+
         // Create root manager.
-        let root_mgr = RootManager::new(&config.engines.runtime.root_path, &workspace_id)?;
+        let root_mgr = RootManager::new(&config.volume.root, &workspace_id)?;
 
         // Resolve path params.
         let relative_folder_path = Self::resolve_url_path(&url_path)?;
@@ -94,7 +98,7 @@ impl ApiRuntime {
         let runtime = Runtime::with_events(
             permissions,
             events,
-            config.engines.runtime.js_runtime.enable_snapshot,
+            config.js_runtime.enable_snapshot,
             custom_postscripts,
             RuntimeOptions {
                 ..Default::default()

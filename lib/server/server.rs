@@ -3,7 +3,6 @@
 use crate::{HttpDriver, Router};
 use futures::{Future, FutureExt};
 use log::{error, info};
-use mysql::*;
 use std::rc::Rc;
 use std::thread;
 use std::{panic::AssertUnwindSafe, sync::Arc};
@@ -23,19 +22,11 @@ use utilities::{
 
 pub struct RuntimeServer {
     setup: Arc<CommonSetup>,
-    db_pool: Pool,
 }
 
 impl RuntimeServer {
-    pub fn new(setup: Arc<CommonSetup>) -> Result<Self> {
-        // Connect to MySQL database.
-        let db_url = &setup.as_ref().config.engines.runtime.db_url;
-        let opts = Opts::from_url(db_url.as_str())?;
-        let db_pool = Pool::new(opts)?;
-
-        info!(r#"Created database pool for = "{}""#, db_url);
-
-        Ok(Self { setup, db_pool })
+    pub fn new(setup: Arc<CommonSetup>) -> Self {
+        Self { setup }
     }
 
     pub async fn listen(&self) -> Result<()> {
